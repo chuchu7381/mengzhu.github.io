@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>快速查找資料小工具</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+  :root{
+    --brand:#364963;
+    --accent:#2d6cdf;
+    --bg:#f5f0e8;
+    --card:#fff;
+    --border:#d0d7de;
+    --muted:#777;
+    --btn-gray:#f1f3f5;
+  }
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:#000000;
+    font-family: "Noto Sans TC", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  }
+  .wrap{
+    min-height:100%; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:720px; background:var(--card);
+    border:2px solid var(--brand); border-radius:20px; box-shadow:6px 6px 0 var(--brand);
+    padding:24px;
+  }
+  h1{margin:0 0 6px; font-size:22px; font-weight:900; letter-spacing:-.2px;}
+  .sub{margin:0 0 16px; font-size:12px; color:var(--muted);}
+
+  /* 常用資料夾 Chips */
+  .chips{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;}
+  .chip{
+    padding:8px 14px; border-radius:999px; border:2px solid var(--border);
+    background:#fff; color:#444; font-weight:800; font-size:13px;
+    cursor:pointer; user-select:none; transition:.15s;
+  }
+  .chip:hover{transform:translateY(-1px)}
+  .chip.selected{background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 6px 20px rgba(45,108,223,.25)}
+
+  .row{display:flex; flex-wrap:wrap; gap:10px; align-items:stretch; margin-top:8px}
+  /* 淺灰底、黑字的主要按鈕 */
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 14px; border-radius:12px; border:2px solid var(--border);
+    background:var(--btn-gray); color:#000000; font-weight:800; cursor:pointer; white-space:nowrap;
+    transition:.15s;
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .section-title{
+    font-size:11px; font-weight:700; color:#999; letter-spacing:1.5px;
+    text-transform:uppercase; margin:6px 0 8px;
+  }
+  .muted{font-size:11px; color:#999; margin-top:8px}
+  .danger{color:#c0392b; font-size:12px; margin-top:10px}
+  .link-list{margin:6px 0 0; padding-left:18px}
+  .link-list a{word-break:break-all}
+  .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card" role="region" aria-label="快速查找資料小工具">
+    <h1>🔎 手創空間快速查找資料小工具</h1>
+    <p class="sub">按鈕可複選（選取會變藍）。按下「開啟選擇的資料夾」後，可能遭「彈出式視窗阻擋」功能攔截（網址處最右邊），請改為一律允許</p>
+
+    <!-- 常用資料夾（可複選） -->
+    <div class="section-title">常用資料夾（可複選）</div>
+    <div id="chips" class="chips" aria-label="常用資料夾按鈕群組"></div>
+
+    <div class="row">
+      <!-- 淺灰底、黑字 -->
+      <button class="btn" id="openSelectedBtn" title="一次開啟所有選取的資料夾">📂 開啟選擇的資料夾</button>
+    </div>
+
+    <!-- 降級提示：若被瀏覽器擋掉多分頁，會顯示在這裡 -->
+    <div id="fallback" style="display:none">
+      <div class="danger">部分分頁可能被瀏覽器的「彈出式視窗阻擋」功能攔截。請允許此頁面開啟新分頁，或手動點以下連結逐一開啟：</div>
+      <ul id="fallbackList" class="link-list"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+/** ===== 你的五個資料夾 URL（已加回） ===== */
+const FOLDERS = [
+  { id: "schedule", name: "課程課表",  url: "https://trgo.sharepoint.com/:f:/s/internaltric1/tl000/IgDQW2cwk-a4SaD4FwFUnP-fAdQbwoc2YnyEZVDwGUz3lRU?e=Kp4Hca" },
+  { id: "lesson",   name: "課程教案",  url: "https://trgo.sharepoint.com/:f:/s/internaltric1/tl000/IgB4RWIhIJH3Q7zBzAIRBn8fAQqUsWGqRTzysLk4paVcF1E?e=V9yTZx" },
+  { id: "photos",   name: "課程照片",  url: "https://trgo.sharepoint.com/:f:/s/internaltric1/tl000/IgCrjymP_FRwSI6GBknaOeyXAS-1QJmbC9XEdhQJ7kO0pnI?e=PPdaqt" },
+  { id: "kitp",     name: "材料包照片",url: "https://trgo.sharepoint.com/:f:/s/internaltric1/tl000/IgBlVvD3io8qToW1XBrNf8PXAQbK6w7AEoE-lqh3V_Pn3kQ?e=vaGRId" },
+  { id: "kitv",     name: "材料包影片",url: "https://trgo.sharepoint.com/:f:/s/internaltric1/tl000/IgAP8XKVjlAGR4nK0sewNMPUASB8g8Jha_Zuvnhr6g6Eaok?e=W14wDX" },
+];
+
+/** ===== 建立可複選 chips（五顆都會出現） ===== */
+const chipsBox = document.getElementById("chips");
+FOLDERS.forEach(f => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "chip";
+  btn.textContent = f.name;
+  btn.title = f.url; // 滑過可看到實際 URL
+  btn.dataset.id = f.id;
+  btn.setAttribute("aria-pressed","false");
+  btn.onclick = () => {
+    const on = btn.classList.toggle("selected");
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  };
+  chipsBox.appendChild(btn);
+});
+
+/** ===== 多分頁開啟（加強版）=====
+ * 1) 優先使用多個 window.open（於同一個點擊事件內觸發）
+ * 2) 萬一有被擋，列於降級連結（fallback）
+ */
+document.getElementById("openSelectedBtn").onclick = () => {
+  const selectedIds = [...document.querySelectorAll(".chip.selected")].map(x => x.dataset.id);
+  const targets = FOLDERS.filter(f => selectedIds.includes(f.id));
+  if (targets.length === 0) {
+    alert("請先選擇至少一個資料夾（上方按鈕）");
+    return;
+  }
+
+  const opened = [];
+  const failed = [];
+
+  // 在同一個使用者手勢中連續 open
+  targets.forEach(t => {
+    const w = window.open(t.url, "_blank", "noopener,noreferrer");
+    if (w && !w.closed) opened.push(t.url);
+    else failed.push(t.url);
+  });
+
+  // 若數量不足 → 顯示降級連結
+  const fb = document.getElementById("fallback");
+  const ul = document.getElementById("fallbackList");
+  if (opened.length < targets.length) {
+    fb.style.display = "block";
+    ul.innerHTML = "";
+    targets.forEach(t => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = t.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = t.url;
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+  } else {
+    fb.style.display = "none";
+  }
+};
+</script>
+</body>
+</html>
